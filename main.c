@@ -9,15 +9,17 @@
 #include "Bank.h"
 
 #define ARG_MAX 25
+#define PARAM_SIZE 64
+#define BUFFER_SIZE 2048
 
 int read_command(char command[], char *params[]);
 
 int validate_input(char* p, long arg, int err);
 
 int main(int argc, char* argv[]) {
-    char *p;
-    char filename[64], buffer[1024];
-    int n_workers, n_accounts, running, ret;
+    char *p, *params[PARAM_SIZE], *command;
+    char filename[PARAM_SIZE], buffer[BUFFER_SIZE];
+    int n_workers, n_accounts, running, ret, i;
     errno = 0;
     FILE *fptr;
     long ID = 0;
@@ -63,6 +65,17 @@ int main(int argc, char* argv[]) {
         if(p == NULL){
             perror("Looks like there was problems taking input.\n");
         }
+        ret = read_command(buffer, params);
+        command = params[0];
+        printf("The command was \"%s\" and the argc was: %d\n", command, ret);
+        fprintf(fptr, "%s", command);
+
+        //Append user input to file to record
+        //TODO: ensure only doing this when no threads are
+        for(i = 1; i<ret; i++) {
+            fprintf(fptr, " %s", params[i]);
+        }
+        fprintf(fptr, "\n");
 
         break;
     }
