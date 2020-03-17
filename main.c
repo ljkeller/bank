@@ -8,6 +8,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include "Bank.h"
+#include "server_helper.h"
 
 #define ARG_MAX 25
 #define PARAM_SIZE 64
@@ -29,7 +30,8 @@ int meets_funds(int acct_id, int amount);
 int main(int argc, char* argv[]) {
     char *p, *params[PARAM_SIZE], *command;
     char filename[PARAM_SIZE], buffer[BUFFER_SIZE];
-    int n_workers, n_accounts, running, ret, i, request_id, account_id, amount;
+    int n_workers, n_accounts, running, ret, i, request_id, account_id, amount, dst_account;
+    int src_account;
     errno = 0;
     FILE *fptr;
     long ID = 0;
@@ -102,17 +104,26 @@ int main(int argc, char* argv[]) {
                 break;
             }
             amount = strtol(params[2], &p, 10);
-            account_id = strol(params[1], &p, 10);
-            ret = meets_funds(account_id,amount);
+            //TODO: input validation on all int to char conversions
+            //TODO: Write a modified version of transfer that takes a series adcounts/amounts.
+            // This will need to work with negative balances...
+            src_account = strtol(params[1], &p, 10);
+            dst_account = strtol(params[3], &p, 10);
+            ret = transfer_balance(src_account, dst_account, amount);
             if(ret != 0) {
-                printf("There was an improper TRANSFER request");
+                errno = ret;
+                printf("There was an improper TRANSFER request\n");
+                gettimeofday(&time_end, NULL);
+                fprintf(fptr, "%d ISF %d %ld.%06.ld %ld.%06.ld", 
+                    request_id, src_account, 
+                    time_start.tv_sec, time_start.tv_usec,
+                    time_end.tv_sec, time_end.tv_usec);
+                
                 break;
             } else {
-                dest_accout = strtol(params[3], &p, 10);
-                deduct(dest_accout);
-                //TODO: write deduce/add balance code
+                gettimeofday(&time_end, NULL);
                 fprintf(fptr, "%d OK TIME %ld.%06.ld %ld.%06.ld", 
-                    request_id, ret, 
+                    request_id,
                     time_start.tv_sec, time_start.tv_usec,
                     time_end.tv_sec, time_end.tv_usec);
 
