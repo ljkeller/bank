@@ -6,15 +6,21 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
+#include "Bank.h"
+
+#define ARG_MAX 25
+
+int read_command(char command[], char *params[]);
 
 int validate_input(char* p, long arg, int err);
 
 int main(int argc, char* argv[]) {
     char *p;
-    char filename[64];
-    int n_workers, n_accounts, running;
+    char filename[64], buffer[1024];
+    int n_workers, n_accounts, running, ret;
     errno = 0;
     FILE *fptr;
+    long ID = 0;
 
     //Program initialization and input checking
     if(argc != 4) {
@@ -29,7 +35,7 @@ int main(int argc, char* argv[]) {
     
     arg = strtol(argv[2], &p, 10);
     if( validate_input(p, arg, errno) != 0) {
-        perror("It looks like there was in invalid input");
+        perror("It looks like there was in invalid input.\n");
     } 
     n_accounts = arg;
 
@@ -38,22 +44,55 @@ int main(int argc, char* argv[]) {
     strcat(filename, ".txt");
     fptr = fopen(filename, "w+");
     if(fptr == NULL) {
-        perror("Bad file handling");
+        perror("Bad file handling\n");
         exit(1);
     }
 
     printf("Launched %d worker threads with %d accounts. "
-            "The output will be %s\n",
+            "The output will be %s.\n",
             n_workers, n_accounts, filename);
 
 
     // Ready to run bank server and take requests
     while(running) {
+        ret = initialize_accounts(n_accounts);
+        if(ret != 0) {
+            perror("Unsuccessful account initializations.\n");
+        }
+        p = fgets(buffer, ARG_MAX, stdin);
+        if(p == NULL){
+            perror("Looks like there was problems taking input.\n");
+
         break;
     }
 
     fclose(fptr);
     return 0; 
+}
+
+//Parses User input into a command with parameters. Returns number of params.
+int read_command(char command[], char *params[]){
+     char *head;
+     const char delim[6] = " \r\n";
+     int i = 0, tracker = -1;
+
+     head = strtok(command, delim);
+     while(head != NULL){
+          tracker = -1; // Tracks if & at eof
+          params[i] = head;
+          if(strcmp(head, "&") == 0){
+               tracker = i;
+          }
+          head = strtok(NULL, delim); // continue through
+          i++;
+     }
+     if(tracker > 0){
+          params[i-1] = NULL;
+          return i;
+     } else {
+          params[i] = NULL; // param must be null terminated char**
+          return i;
+     }
 }
 
 int validate_input(char* p, long arg, int err) {
