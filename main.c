@@ -62,6 +62,7 @@ int main(int argc, char* argv[]) {
         p = fgets(buffer, ARG_MAX, stdin);
         if(p == NULL){
             perror("Looks like there was problems taking input.\n");
+        }
 
         break;
     }
