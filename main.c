@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
+#include <sys/time.h>
 #include "Bank.h"
 
 #define ARG_MAX 25
@@ -22,13 +23,17 @@ int proc_trans();
 
 void write_file(FILE *fptr, char* params[], int argc);
 
+int meets_funds(int acct_id, int amount);
+
+
 int main(int argc, char* argv[]) {
     char *p, *params[PARAM_SIZE], *command;
     char filename[PARAM_SIZE], buffer[BUFFER_SIZE];
-    int n_workers, n_accounts, running, ret, i, request_id, account_id;
+    int n_workers, n_accounts, running, ret, i, request_id, account_id, amount;
     errno = 0;
     FILE *fptr;
     long ID = 0;
+    struct timeval time_start, time_end;
 
     //Program initialization and input checking
     if(argc != 4) {
@@ -65,16 +70,19 @@ int main(int argc, char* argv[]) {
             n_workers, n_accounts, filename);
 
 
+    //Account initialization
     request_id = 0;
+    ret = initialize_accounts(n_accounts);
+    if(ret == 0) {
+        errno = EHOSTUNREACH;
+        perror("Unsuccessful account initializations.\n");
+    }
     // Ready to run bank server and take requests
     while(running) {
-        ret = initialize_accounts(n_accounts);
-        if(ret == 0) {
-            errno = EHOSTUNREACH;
-            perror("Unsuccessful account initializations.\n");
-        }
         printf("Accepting user input: ");
         p = fgets(buffer, ARG_MAX, stdin);
+        gettimeofday(&time_start, NULL);
+
         if(p == NULL){
             errno = EINVAL;
             perror("Looks like there was problems taking input.\n");
@@ -87,7 +95,29 @@ int main(int argc, char* argv[]) {
             break;
         } else if(strcmp(command, "TRANS") == 0) {
             imm_response(request_id);
-            proc_trans();
+            //proc_trans();
+            if(ret < 4 || (ret - 2) % 2 != 0) {
+                errno = EINVAL;
+                perror("Looks like insufficient or bad parameters");
+                break;
+            }
+            amount = strtol(params[2], &p, 10);
+            account_id = strol(params[1], &p, 10);
+            ret = meets_funds(account_id,amount);
+            if(ret != 0) {
+                printf("There was an improper TRANSFER request");
+                break;
+            } else {
+                dest_accout = strtol(params[3], &p, 10);
+                deduct(dest_accout);
+                //TODO: write deduce/add balance code
+                fprintf(fptr, "%d OK TIME %ld.%06.ld %ld.%06.ld", 
+                    request_id, ret, 
+                    time_start.tv_sec, time_start.tv_usec,
+                    time_end.tv_sec, time_end.tv_usec);
+
+
+            }
         } else if(strcmp(command, "CHECK") == 0) {
             if(ret == 1) {
                 errno = EINVAL;
@@ -96,11 +126,15 @@ int main(int argc, char* argv[]) {
                 break;
             } 
             imm_response(request_id); 
-            //write_file(fptr, params, ret); //Writes command and params to file
+            //TODO: Track request time.
             account_id = strtol(params[1], &p, 10);
             printf("The account id was %d\n", account_id);
             ret = read_account(account_id);
-            fprintf(fptr, "%d BAL  %d", request_id, ret);
+            gettimeofday(&time_end, NULL);
+            fprintf(fptr, "%d BAL %d TIME %ld.%06.ld %ld.%06.ld", 
+                    request_id, ret, 
+                    time_start.tv_sec, time_start.tv_usec,
+                    time_end.tv_sec, time_end.tv_usec);
         } else {
             errno = EINVAL;
             request_id--;
@@ -173,3 +207,13 @@ void write_file(FILE *fptr, char* params[], int argc){
         fprintf(fptr, " %s", params[i]);
     }
 }
+
+int meets_funds(int acct_id, int amount) {
+    int balance = read_account(acct_id);
+    if(amount > balance) {
+        return EBADE; 
+    } else {
+        return 0;
+    }
+}
+    
