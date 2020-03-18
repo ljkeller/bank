@@ -59,3 +59,52 @@ int transfer_balance(int src_acct_id, int dst_acct_id, int amount) {
     add_balance(dst_acct_id, amount);
     return 0;
 }
+//Parses User input into a command with parameters. Returns number of params.
+int read_command(char command[], char *params[]){
+     char *head;
+     const char delim[6] = " \r\n";
+     int i = 0, tracker = -1;
+
+     head = strtok(command, delim);
+     while(head != NULL){
+          tracker = -1; // Tracks if & at eof
+          params[i] = head;
+          if(strcmp(head, "&") == 0){
+               tracker = i;
+          }
+          head = strtok(NULL, delim); // continue through
+          i++;
+     }
+     if(tracker > 0){
+          params[i-1] = NULL;
+          return i;
+     } else {
+          params[i] = NULL; // param must be null terminated char**
+          return i;
+     }
+}
+
+int validate_input(char* p, long arg, int err) {
+    if(*p != '\0' || err != 0) {
+        return 1;
+    } else if(arg < INT_MIN || arg > INT_MAX) {
+        return 2;
+    } else { 
+        return 0; 
+    } 
+}
+
+void imm_response(int request_id){
+    printf("ID %d\n", request_id);
+}
+
+int proc_trans(){
+    return 0;
+}
+
+void write_file(FILE *fptr, char* params[], int argc){
+    int i = 0;
+    for(i = 0; i<argc; i++) {
+        fprintf(fptr, " %s", params[i]);
+    }
+}
