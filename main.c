@@ -7,12 +7,37 @@
 #include <unistd.h>
 #include <time.h>
 #include <sys/time.h>
+#include <stdint.h>
 #include "Bank.h"
 #include "server_helper.h"
+
 
 #define ARG_MAX 25
 #define PARAM_SIZE 64
 #define BUFFER_SIZE 2048
+#define CHECK 1
+#define TRANS 2
+#define END 3
+
+struct trans { 
+    int acc_id; // account ID
+    int amount; // amount for transaction
+};
+
+struct job {
+    uint8_t type;
+    struct job *next; //pointer to next request in the list
+    int request_id; //request ID assigned by main thread
+    int check_acc_id; //account ID for a CHECK request
+    struct trans *transactions; //array of transaction data
+    int num_trans; // number of accounts in this transaction
+    struct timeval start_time, end_time; //start and end time for TIME
+};
+
+struct queue {
+    struct job *head, *tail;
+    int num_jobs;
+};
 
 int main(int argc, char* argv[]) {
     char *p, *params[PARAM_SIZE], *command;
@@ -74,6 +99,7 @@ int main(int argc, char* argv[]) {
 
         if(p == NULL){
             errno = EINVAL;
+            request_id--;
             perror("Looks like there was problems taking input.\n");
         }
         request_id++;
@@ -84,19 +110,25 @@ int main(int argc, char* argv[]) {
             break;
         } else if(strcmp(command, "TRANS") == 0) {
             imm_response(request_id);
-            //proc_trans();
             if(ret < 4 || (ret - 2) % 2 != 0) {
                 errno = EINVAL;
                 perror("Looks like insufficient or bad parameters");
+                request_id--;
                 break;
             }
             amount = strtol(params[2], &p, 10);
             //TODO: input validation on all int to char conversions
             //TODO: Write a modified version of transfer that takes a series adcounts/amounts.
-            // This will need to work with negative balances...
-            src_account = strtol(params[1], &p, 10);
-            dst_account = strtol(params[3], &p, 10);
+            if(amount >= 0) { //consider money movement with positive vs negative amount
+                src_account = strtol(params[1], &p, 10);
+                dst_account = strtol(params[3], &p, 10);
+            } else {
+                src_account = strtol(params[3], &p, 10);
+                dst_account = strtol(params[1], &p, 10);
+            }
             ret = transfer_balance(src_account, dst_account, amount);
+
+            //Bad user input, bad transfer
             if(ret != 0) {
                 errno = ret;
                 printf("There was an improper TRANSFER request\n");
@@ -105,26 +137,28 @@ int main(int argc, char* argv[]) {
                     request_id, src_account, 
                     time_start.tv_sec, time_start.tv_usec,
                     time_end.tv_sec, time_end.tv_usec);
+                request_id--;
                 
                 break;
-            } else {
-                gettimeofday(&time_end, NULL);
-                fprintf(fptr, "%d OK TIME %ld.%06.ld %ld.%06.ld", 
-                    request_id,
-                    time_start.tv_sec, time_start.tv_usec,
-                    time_end.tv_sec, time_end.tv_usec);
+            } 
+
+            gettimeofday(&time_end, NULL);
+            fprintf(fptr, "%d OK TIME %ld.%06.ld %ld.%06.ld", 
+                request_id,
+                time_start.tv_sec, time_start.tv_usec,
+                time_end.tv_sec, time_end.tv_usec);
 
 
-            }
         } else if(strcmp(command, "CHECK") == 0) {
-            if(ret == 1) {
+            //Bad user input
+            if(ret != 2) {
                 errno = EINVAL;
-                perror("Missing <accountid>");
+                perror("This call should take an CHECK <account_id>. Too many or too few args");
                 request_id--;
                 break;
             } 
+
             imm_response(request_id); 
-            //TODO: Track request time.
             account_id = strtol(params[1], &p, 10);
             printf("The account id was %d\n", account_id);
             ret = read_account(account_id);
@@ -138,16 +172,6 @@ int main(int argc, char* argv[]) {
             request_id--;
             perror("Failure to provide valid input");
         }
-        //printf("The command was \"%s\" and the argc was: %d\n", command, ret);
-        /*fprintf(fptr, "%s", command);
-
-        //Append user input to file to record
-        //TODO: ensure only doing this when no threads are
-        for(i = 1; i<ret; i++) {
-            fprintf(fptr, " %s", params[i]);
-        }
-        fprintf(fptr, "\n");
-        */
 
         break;
     }
