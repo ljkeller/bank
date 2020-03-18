@@ -19,6 +19,7 @@
 
 int main(int argc, char* argv[]) {
     struct job first_job;
+    struct queue job_queue;
     char *p, *params[PARAM_SIZE], *command;
     char filename[PARAM_SIZE], buffer[BUFFER_SIZE];
     int n_workers, n_accounts, running, ret, i, request_id, account_id, amount, dst_account;
@@ -85,6 +86,7 @@ int main(int argc, char* argv[]) {
         ret = read_command(buffer, params);
         command = params[0];
         ret = params_to_job(params, ret, &first_job, request_id);
+        //TODO: Dynamically allocate new processes
         if(ret != 0) {
             //TODO: WIll need to deallocate or something
             errno = ret;
@@ -172,4 +174,10 @@ int main(int argc, char* argv[]) {
 
 void consumer() { 
     
+}
+
+void append(struct queue *queue) {
+}
+
+void pop(struct queue *queue) {
 }
