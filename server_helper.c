@@ -1,9 +1,13 @@
 #include "Bank.h"
+#include "server_helper.h"
 #include <sys/time.h>
 #include <errno.h>
 #include <limits.h>
+#include <sys/time.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
+
 
 /*
  * Deduct a balance from a bank account
@@ -93,6 +97,7 @@ int read_command(char command[], char *params[]){
      }
 }
 
+
 /*
  * Ensures that a given argument is a valid sized integer converted from a char
  * Input: char char* p - the char pointer representing the end of the converted arg
@@ -133,4 +138,88 @@ void write_file(FILE *fptr, char* params[], int argc){
     for(i = 0; i<argc; i++) {
         fprintf(fptr, " %s", params[i]);
     }
+}
+
+void print_job(struct job *job) {
+    printf("Type: %d\tReq_id: %d\tCheck_acct: %d\tnum_trans: %d\tTime start: %ld.%06ld\n",
+            job->type,
+            job->request_id,
+            job->check_acc_id,
+            job->num_trans,
+            job->start_time.tv_sec, job->start_time.tv_usec);
+}
+
+int params_to_job(char *params[], int argc, struct job *request, int req_id) {
+    char *p;
+    struct trans *transactions;
+    long ret_amount, ret_acct_id, ret;
+    int i = 0, num_trans;
+    struct timeval cur_time;
+    if(argc < 1) { //Insufficient args
+        return EINVAL;
+    }
+     
+    //TODO: THis time might need fixing
+    ret = gettimeofday(&cur_time, NULL);
+    if(ret != 0) {
+        perror("Time-related issue.");
+        return ret;
+    }
+
+    request->start_time = cur_time;
+    request->request_id = req_id;
+    if(strcmp(params[0], "END") == 0) {
+        request->type = END;
+    } else if(strcmp(params[0], "CHECK") == 0) {
+        request->type = CHECK;
+        if(argc != 2) {
+            errno = EINVAL;
+            perror("It looks like there were an invalid number of args");
+            return EINVAL;
+        }
+        ret_acct_id = strtol(params[1], &p, 10); 
+        errno = validate_input(p, ret_acct_id, errno); //errno is thread safe/thread specific!
+        if(errno == 0) {
+            request->check_acc_id = ret_acct_id;
+        } else {
+            errno = EINVAL;
+            perror("It looks like there was an invalid account ID");
+            return EINVAL;
+        }
+    } else if(strcmp(params[0], "TRANS") == 0) {
+        request->type = TRANS;
+        if((argc - 1) % 2 != 0) { //Need account_ID and amount for every transaction
+            errno = EINVAL;
+            perror("It looks like there were an invalid amount of transfers.");
+            return EINVAL;
+        }
+        
+        num_trans = (argc - 1) / 2;
+        request->num_trans = num_trans; //Dont update transactions here, just number
+        transactions = (struct trans*) malloc(sizeof(struct trans) * num_trans);
+        
+        for(i = 1; i <= num_trans; i++) {
+            ret_acct_id = strtol(params[i], &p, 10);
+            errno = validate_input(p, ret_acct_id, errno);
+            if(errno != 0) {
+                perror("It looks like there was an error with acct_id");
+                free(transactions);
+                return EINVAL;
+            }
+            ret_amount = strtol(params[i + 1], &p, 10);
+            errno = validate_input(p, ret_amount, errno);
+            if(errno != 0) {
+                perror("It looks like there was an error with an amount");
+                free(transactions);
+                return EINVAL;
+            }
+	        transactions[i].acc_id = ret_acct_id;
+	        transactions[i].amount = ret_amount;
+        }
+        request->transactions = transactions;
+    } else {
+        return EINVAL; //invalid input
+    }
+    return 0;
+     
 }

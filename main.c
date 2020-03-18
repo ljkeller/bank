@@ -8,6 +8,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <stdint.h>
+#include <pthread.h>
 #include "Bank.h"
 #include "server_helper.h"
 
@@ -15,31 +16,9 @@
 #define ARG_MAX 25
 #define PARAM_SIZE 64
 #define BUFFER_SIZE 2048
-#define CHECK 1
-#define TRANS 2
-#define END 3
-
-struct trans { 
-    int acc_id; // account ID
-    int amount; // amount for transaction
-};
-
-struct job {
-    uint8_t type;
-    struct job *next; //pointer to next request in the list
-    int request_id; //request ID assigned by main thread
-    int check_acc_id; //account ID for a CHECK request
-    struct trans *transactions; //array of transaction data
-    int num_trans; // number of accounts in this transaction
-    struct timeval start_time, end_time; //start and end time for TIME
-};
-
-struct queue {
-    struct job *head, *tail;
-    int num_jobs;
-};
 
 int main(int argc, char* argv[]) {
+    struct job first_job;
     char *p, *params[PARAM_SIZE], *command;
     char filename[PARAM_SIZE], buffer[BUFFER_SIZE];
     int n_workers, n_accounts, running, ret, i, request_id, account_id, amount, dst_account;
@@ -105,7 +84,18 @@ int main(int argc, char* argv[]) {
         request_id++;
         ret = read_command(buffer, params);
         command = params[0];
+        ret = params_to_job(params, ret, &first_job, request_id);
+        if(ret != 0) {
+            //TODO: WIll need to deallocate or something
+            errno = ret;
+            perror("Invalid input");
+            request_id--;
+            break;
+        }
+        print_job(&first_job);
+        break;
         
+        /*
         if(strcmp(command, "END") == 0) {
             break;
         } else if(strcmp(command, "TRANS") == 0) {
@@ -172,10 +162,14 @@ int main(int argc, char* argv[]) {
             request_id--;
             perror("Failure to provide valid input");
         }
-
+        */
         break;
     }
 
     fclose(fptr);
     return 0; 
+}
+
+void consumer() { 
+    
 }

@@ -3,7 +3,34 @@
 #include <errno.h>
 #include <limits.h>
 #include <string.h>
+#include <sys/time.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+
+#define CHECK 1
+#define TRANS 2
+#define END 3
+
+struct trans { 
+    int acc_id; // account ID
+    int amount; // amount for transaction
+};
+
+struct job {
+    uint8_t type;
+    struct job *next; //pointer to next request in the list
+    int request_id; //request ID assigned by main thread
+    int check_acc_id; //account ID for a CHECK request
+    struct trans *transactions; //array of transaction data
+    int num_trans; // number of accounts in this transaction
+    struct timeval start_time, end_time; //start and end time for TIME
+};
+
+struct queue {
+    struct job *head, *tail;
+    int num_jobs;
+};
 
 /*
  * Deduct a balance from a bank account
@@ -70,3 +97,7 @@ int validate_input(char *p, long arg, int err);
  * return: argc, the number of parameter items present including command
  */
 int read_command(char command[], char *params[]);
+
+int params_to_job(char *params[], int argc, struct job *request, int req_id);
+
+void print_job(struct job *job); 
