@@ -62,7 +62,13 @@ int transfer_balance(int src_acct_id, int dst_acct_id, int amount) {
     add_balance(dst_acct_id, amount);
     return 0;
 }
-//Parses User input into a command with parameters. Returns number of params.
+
+/*
+ * Parses user input to return array of (char) argv
+ * Input: char command[] - contigous char array of user input
+ * Input:  char *params[]  - argv structure for parsed command into its parameters
+ * return: argc, the number of parameter items present including command
+ */
 int read_command(char command[], char *params[]){
      char *head;
      const char delim[6] = " \r\n";
@@ -87,16 +93,27 @@ int read_command(char command[], char *params[]){
      }
 }
 
+/*
+ * Ensures that a given argument is a valid sized integer converted from a char
+ * Input: char char* p - the char pointer representing the end of the converted arg
+ * Input: long arg - the long variable converted from a char array. Check to see if int sized
+ * Input: int err - the error code returned from strtol
+ * return: 0 on success, or errno on error
+ */
 int validate_input(char* p, long arg, int err) {
     if(*p != '\0' || err != 0) {
-        return 1;
+        return EINVAL;
     } else if(arg < INT_MIN || arg > INT_MAX) {
-        return 2;
+        return ERANGE;
     } else { 
         return 0; 
     } 
 }
 
+/*
+ * Posts an immediate response to stdout to let customer know request is being processed
+ * Input: int request_id - the ID that corresponds to this user request
+ */
 void imm_response(int request_id){
     printf("ID %d\n", request_id);
 }
@@ -105,6 +122,12 @@ int proc_trans(){
     return 0;
 }
 
+/*
+ * Writes given parameters to file to log behaviour
+ * Input: FILE *fptr - the file being written
+ * Input: char* params[] - given parameters being logged
+ * Input: int argc - the number of parameters being written
+ */
 void write_file(FILE *fptr, char* params[], int argc){
     int i = 0;
     for(i = 0; i<argc; i++) {
