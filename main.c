@@ -14,19 +14,6 @@
 #define PARAM_SIZE 64
 #define BUFFER_SIZE 2048
 
-int read_command(char command[], char *params[]);
-
-int validate_input(char* p, long arg, int err);
-
-void imm_response(int request_id);
-
-int proc_trans();
-
-void write_file(FILE *fptr, char* params[], int argc);
-
-int meets_funds(int acct_id, int amount);
-
-
 int main(int argc, char* argv[]) {
     char *p, *params[PARAM_SIZE], *command;
     char filename[PARAM_SIZE], buffer[BUFFER_SIZE];
@@ -168,63 +155,3 @@ int main(int argc, char* argv[]) {
     fclose(fptr);
     return 0; 
 }
-
-//Parses User input into a command with parameters. Returns number of params.
-int read_command(char command[], char *params[]){
-     char *head;
-     const char delim[6] = " \r\n";
-     int i = 0, tracker = -1;
-
-     head = strtok(command, delim);
-     while(head != NULL){
-          tracker = -1; // Tracks if & at eof
-          params[i] = head;
-          if(strcmp(head, "&") == 0){
-               tracker = i;
-          }
-          head = strtok(NULL, delim); // continue through
-          i++;
-     }
-     if(tracker > 0){
-          params[i-1] = NULL;
-          return i;
-     } else {
-          params[i] = NULL; // param must be null terminated char**
-          return i;
-     }
-}
-
-int validate_input(char* p, long arg, int err) {
-    if(*p != '\0' || err != 0) {
-        return 1;
-    } else if(arg < INT_MIN || arg > INT_MAX) {
-        return 2;
-    } else { 
-        return 0; 
-    } 
-}
-
-void imm_response(int request_id){
-    printf("ID %d\n", request_id);
-}
-
-int proc_trans(){
-    return 0;
-}
-
-void write_file(FILE *fptr, char* params[], int argc){
-    int i = 0;
-    for(i = 0; i<argc; i++) {
-        fprintf(fptr, " %s", params[i]);
-    }
-}
-
-int meets_funds(int acct_id, int amount) {
-    int balance = read_account(acct_id);
-    if(amount > balance) {
-        return EBADE; 
-    } else {
-        return 0;
-    }
-}
-    

@@ -1,6 +1,9 @@
 #include "Bank.h"
 #include <sys/time.h>
 #include <errno.h>
+#include <limits.h>
+#include <string.h>
+#include <stdio.h>
 
 /*
  * Deduct a balance from a bank account
