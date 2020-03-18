@@ -28,6 +28,9 @@ pthread_mutex_t *ACCT_muts, queue_mut;
 
 pthread_cond_t end_main;
 
+//for testing reason
+FILE *fptr;
+
 int main(int argc, char* argv[]) {
     pthread_t *tid_workers; //Record thread IDs for all workers
 
@@ -38,7 +41,6 @@ int main(int argc, char* argv[]) {
     int n_workers, n_accounts, running, ret, i, request_id, account_id, amount, dst_account;
     int src_account;
     errno = 0;
-    FILE *fptr;
     long ID = 0;
     struct timeval time_start, time_end;
 
@@ -206,8 +208,11 @@ int main(int argc, char* argv[]) {
 }
 
 void* worker() { 
-    //Wait for more input, unless end_main == 1
+    //Wait for more input, unless end_m== 1
     pthread_mutex_lock(&queue_mut);
+    flockfile(fptr);
+    fprintf(fptr, "Hello\n");
+    funlockfile(fptr);
     printf("Hello!\n");
     fflush(stdout);
     pthread_mutex_unlock(&queue_mut);
