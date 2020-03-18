@@ -17,7 +17,20 @@
 #define PARAM_SIZE 64
 #define BUFFER_SIZE 2048
 
+void* worker();
+
+void append(struct queue *queue);
+
+void pop(struct queue *queue);
+
+//Global variables shared by threads
+pthread_mutex_t *ACCT_muts, queue_mut;
+
+pthread_cond_t end_main;
+
 int main(int argc, char* argv[]) {
+    pthread_t *tid_workers; //Record thread IDs for all workers
+
     struct job first_job;
     struct queue job_queue;
     char *p, *params[PARAM_SIZE], *command;
@@ -35,19 +48,28 @@ int main(int argc, char* argv[]) {
         perror("It looks like there were insufficient inputs");
     }
 
+    //THREAD ARRAY ALLOCATION
     long arg = strtol(argv[1], &p, 10);
     if( validate_input(p, arg, errno) != 0) {
         errno = EINVAL;
         perror("It looks like there was in invalid input");
     }
     n_workers = arg; //Number of worker threads
+    tid_workers = (pthread_t *) malloc(sizeof(pthread_t) * n_workers);
     
+    //MUTEX INITIALIZATION
     arg = strtol(argv[2], &p, 10);
-    if( validate_input(p, arg, errno) != 0) {
+    if(validate_input(p, arg, errno) != 0) {
         errno = EINVAL;
         perror("It looks like there was in invalid input.\n");
     } 
     n_accounts = arg;
+    ACCT_muts = (pthread_mutex_t *) malloc(sizeof(pthread_mutex_t) * n_accounts);
+    for(i = 0; i < n_accounts; i++) {
+        pthread_mutex_init(&ACCT_muts[i], NULL); //Initialize all account mutexes
+    }
+    pthread_mutex_init(&queue_mut, NULL); //Initializae the queue
+    pthread_cond_init(&end_main, NULL);
 
     //File handling for output file
     strcpy(filename, argv[3]);
@@ -71,6 +93,12 @@ int main(int argc, char* argv[]) {
         errno = EHOSTUNREACH;
         perror("Unsuccessful account initializations.\n");
     }
+
+    //THREAD CREATION
+    for(i = 0; i < n_workers; i++) {
+        pthread_create(&tid_workers[i], NULL, worker, NULL);
+    }
+
     // Ready to run bank server and take requests
     while(running) {
         printf("Accepting user input: ");
@@ -168,12 +196,21 @@ int main(int argc, char* argv[]) {
         break;
     }
 
+    //Wait for all threads to join
+    for(i = 0; i < n_workers; i++) {
+        pthread_join(tid_workers[i], NULL);
+    }
+
     fclose(fptr);
     return 0; 
 }
 
-void consumer() { 
-    
+void* worker() { 
+    //Wait for more input, unless end_main == 1
+    pthread_mutex_lock(&queue_mut);
+    printf("Hello!\n");
+    fflush(stdout);
+    pthread_mutex_unlock(&queue_mut);
 }
 
 void append(struct queue *queue) {
