@@ -19,7 +19,7 @@
 
 void* worker();
 
-void append(struct queue *queue);
+void append(struct queue *q, struct job *j);
 
 void pop(struct queue *queue);
 
@@ -211,14 +211,24 @@ void* worker() {
     //Wait for more input, unless end_m== 1
     pthread_mutex_lock(&queue_mut);
     flockfile(fptr);
-    fprintf(fptr, "Hello\n");
+    //DO WRITING HERE
     funlockfile(fptr);
     printf("Hello!\n");
     fflush(stdout);
     pthread_mutex_unlock(&queue_mut);
 }
 
-void append(struct queue *queue) {
+void append(struct queue *q, struct job *j) {
+    if(j == NULL) {
+        return;
+    }
+    if(q->num_jobs < 1){
+        q->head = j;
+    } else {
+        q->tail->next = j;
+    }
+    q->tail = j;
+    q->num_jobs++;
 }
 
 void pop(struct queue *queue) {
