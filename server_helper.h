@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include "queue.h"
 
 #define CHECK 1
 #define TRANS 2
@@ -27,10 +28,7 @@ struct job {
     struct timeval start_time, end_time; //start and end time for TIME
 };
 
-struct queue {
-    struct job *head, *tail;
-    int num_jobs;
-};
+
 
 /*
  * Deduct a balance from a bank account

@@ -19,9 +19,11 @@
 
 void* worker();
 
-void append(struct queue *q, struct job *j);
+void init_queue(struct queue *q);
 
-void pop(struct queue *queue);
+void push(struct queue *q, struct job *j);
+
+struct job* pop(struct queue *q);
 
 //Global variables shared by threads
 pthread_mutex_t *ACCT_muts, queue_mut;
@@ -88,14 +90,15 @@ int main(int argc, char* argv[]) {
             n_workers, n_accounts, filename);
 
 
-    //Account initialization
+    //Account initialization, queue initialization
     request_id = 0;
     ret = initialize_accounts(n_accounts);
     if(ret == 0) {
         errno = EHOSTUNREACH;
         perror("Unsuccessful account initializations.\n");
     }
-
+    init_queue(&job_queue);
+    printf("did it");
     //THREAD CREATION
     for(i = 0; i < n_workers; i++) {
         pthread_create(&tid_workers[i], NULL, worker, NULL);
@@ -216,9 +219,17 @@ void* worker() {
     printf("Hello!\n");
     fflush(stdout);
     pthread_mutex_unlock(&queue_mut);
+    //Deallocate job, transactions by now
 }
 
-void append(struct queue *q, struct job *j) {
+
+void init_queue(struct queue *q) {
+    q->head = NULL;
+    q->tail = NULL;
+    q->num_jobs = 0;
+}
+
+void push(struct queue *q, struct job *j) {
     if(j == NULL) {
         return;
     }
@@ -231,5 +242,13 @@ void append(struct queue *q, struct job *j) {
     q->num_jobs++;
 }
 
-void pop(struct queue *queue) {
+struct job* pop(struct queue *q) {
+    if(q->num_jobs < 1) {
+        errno = EINVAL;
+        return NULL;
+    }
+    struct job *j = q->head;
+    q->head = q->head->next;
+    q->num_jobs--;
+    return j;
 }
