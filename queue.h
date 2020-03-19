@@ -55,4 +55,8 @@ struct job* pop(struct queue *q);
  */
 int q_size(struct queue *q);
 
+struct job* new_job(int req_id);
+
+struct trans* new_trans(int acc_id, int amount);
+
 #endif /*end guard*/
