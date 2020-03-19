@@ -11,6 +11,7 @@
 #include <pthread.h>
 #include "Bank.h"
 #include "server_helper.h"
+#include "queue.h"
 
 
 #define ARG_MAX 25
@@ -18,12 +19,6 @@
 #define BUFFER_SIZE 2048
 
 void* worker();
-
-void init_queue(struct queue *q);
-
-void push(struct queue *q, struct job *j);
-
-struct job* pop(struct queue *q);
 
 //Global variables shared by threads
 pthread_mutex_t *ACCT_muts, queue_mut;
@@ -220,35 +215,4 @@ void* worker() {
     fflush(stdout);
     pthread_mutex_unlock(&queue_mut);
     //Deallocate job, transactions by now
-}
-
-
-void init_queue(struct queue *q) {
-    q->head = NULL;
-    q->tail = NULL;
-    q->num_jobs = 0;
-}
-
-void push(struct queue *q, struct job *j) {
-    if(j == NULL) {
-        return;
-    }
-    if(q->num_jobs < 1){
-        q->head = j;
-    } else {
-        q->tail->next = j;
-    }
-    q->tail = j;
-    q->num_jobs++;
-}
-
-struct job* pop(struct queue *q) {
-    if(q->num_jobs < 1) {
-        errno = EINVAL;
-        return NULL;
-    }
-    struct job *j = q->head;
-    q->head = q->head->next;
-    q->num_jobs--;
-    return j;
 }

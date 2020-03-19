@@ -1,4 +1,5 @@
 #include "server_helper.h"
+#include "queue.h"
 
 /*
  * Deduct a balance from a bank account

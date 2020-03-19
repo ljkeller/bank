@@ -36,6 +36,10 @@ struct job* pop(struct queue *q) {
     return j;
 }
 
+int q_size(struct queue *q) {
+    return q->num_jobs;
+}
+/*
 int main() {
     int i;
     struct queue q;  
@@ -59,7 +63,8 @@ int main() {
         printf("Getting rid of %d, the next reqID is %d.", ret->request_id, 
                 ret->next->request_id);
         printf("This node was recieved at %ld.", ret->start_time.tv_sec);
-        printf("There are currently %d items in queue.\n", q.num_jobs);
+        printf("There are currently %d items in queue.\n", q_size(&q));
     }
     return 1;
 }
+*/
