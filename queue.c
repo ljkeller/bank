@@ -55,7 +55,6 @@ void push(struct queue *q, struct job *j) {
     }
     q->tail = j;
     q->num_jobs++;
-    printf("Just put %d into queue for %d items\n", j->request_id, q->num_jobs);
 }
 
 struct job* pop(struct queue *q) {
@@ -72,33 +71,3 @@ struct job* pop(struct queue *q) {
 int q_size(struct queue *q) {
     return q->num_jobs;
 }
-
-/*
-int main() {
-    int i;
-    struct queue q;  
-    init_queue(&q);
-    struct job jobs[10], *ret, *j;
-    struct trans transactions[10], *t;
-
-    printf("Initializing 10 accounts and putting into queue");
-    for(i = 0; i<10; i++) {
-        j = new_job(i);
-        j->num_trans = 1;
-        t = new_trans(i, i*10);
-        j->transactions = t;
-        push(&q, j);
-        usleep(i);
-    }
-
-    for(int i = 0; i<10; i++) {
-        ret = pop(&q);
-        printf("Getting rid of %d, the next reqID is %d.", ret->request_id, 
-                ret->next->request_id);
-        printf("This node was recieved at %ld.%06ld.", 
-                ret->start_time.tv_sec, ret->start_time.tv_usec);
-        printf("There are currently %d items in queue.\n", q_size(&q));
-    }
-    return 1;
-}
-*/
