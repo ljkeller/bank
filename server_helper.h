@@ -76,6 +76,17 @@ int validate_input(char *p, long arg, int err);
  */
 int read_command(char command[], char *params[]);
 
-int params_to_job(char *params[], int argc, struct job *request, int req_id);
+int params_to_job(char *params[], int argc, struct job *request, int n_accounts);
 
 void print_job(struct job *job); 
+
+int proc_transactions(struct trans *t, int n_jobs);
+
+int proc_transaction(struct trans *t);
+
+void undo_transaction(struct trans *t);
+
+int process_job(struct job *j, FILE *fptr);
+
+void fr_job(struct job *j);
+

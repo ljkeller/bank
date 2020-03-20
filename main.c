@@ -14,9 +14,8 @@
 #include "queue.h"
 
 
-#define ARG_MAX 25
-#define PARAM_SIZE 64
-#define BUFFER_SIZE 2048
+#define PARAM_SIZE 32
+#define BUFFER_SIZE 1024
 
 void* worker();
 
@@ -31,7 +30,7 @@ FILE *fptr;
 int main(int argc, char* argv[]) {
     pthread_t *tid_workers; //Record thread IDs for all workers
 
-    struct job first_job;
+    struct job first_job, *j;
     struct queue job_queue;
     char *p, *params[PARAM_SIZE], *command;
     char filename[PARAM_SIZE], buffer[BUFFER_SIZE];
@@ -93,7 +92,8 @@ int main(int argc, char* argv[]) {
         perror("Unsuccessful account initializations.\n");
     }
     init_queue(&job_queue);
-    printf("did it");
+    running = 1;
+   
     //THREAD CREATION
     for(i = 0; i < n_workers; i++) {
         pthread_create(&tid_workers[i], NULL, worker, NULL);
@@ -102,7 +102,7 @@ int main(int argc, char* argv[]) {
     // Ready to run bank server and take requests
     while(running) {
         printf("Accepting user input: ");
-        p = fgets(buffer, ARG_MAX, stdin);
+        p = fgets(buffer, BUFFER_SIZE, stdin);
         gettimeofday(&time_start, NULL);
 
         if(p == NULL){
@@ -112,88 +112,22 @@ int main(int argc, char* argv[]) {
         }
         request_id++;
         ret = read_command(buffer, params);
+        j = new_job(request_id);
         command = params[0];
-        ret = params_to_job(params, ret, &first_job, request_id);
+        ret = params_to_job(params, ret, j, n_accounts);
         //TODO: Dynamically allocate new processes
         if(ret != 0) {
-            //TODO: WIll need to deallocate or something
+            fr_job(j); //DEALLOCATE JOBS AND TRANSACTIONS
             errno = ret;
-            perror("Invalid input");
+            printf("Resetting request id\n");
             request_id--;
-            break;
         }
-        print_job(&first_job);
-        break;
-        
-        /*
-        if(strcmp(command, "END") == 0) {
-            break;
-        } else if(strcmp(command, "TRANS") == 0) {
-            imm_response(request_id);
-            if(ret < 4 || (ret - 2) % 2 != 0) {
-                errno = EINVAL;
-                perror("Looks like insufficient or bad parameters");
-                request_id--;
-                break;
-            }
-            amount = strtol(params[2], &p, 10);
-            //TODO: input validation on all int to char conversions
-            //TODO: Write a modified version of transfer that takes a series adcounts/amounts.
-            if(amount >= 0) { //consider money movement with positive vs negative amount
-                src_account = strtol(params[1], &p, 10);
-                dst_account = strtol(params[3], &p, 10);
-            } else {
-                src_account = strtol(params[3], &p, 10);
-                dst_account = strtol(params[1], &p, 10);
-            }
-            ret = transfer_balance(src_account, dst_account, amount);
-
-            //Bad user input, bad transfer
-            if(ret != 0) {
-                errno = ret;
-                printf("There was an improper TRANSFER request\n");
-                gettimeofday(&time_end, NULL);
-                fprintf(fptr, "%d ISF %d %ld.%06.ld %ld.%06.ld", 
-                    request_id, src_account, 
-                    time_start.tv_sec, time_start.tv_usec,
-                    time_end.tv_sec, time_end.tv_usec);
-                request_id--;
-                
-                break;
-            } 
-
-            gettimeofday(&time_end, NULL);
-            fprintf(fptr, "%d OK TIME %ld.%06.ld %ld.%06.ld", 
-                request_id,
-                time_start.tv_sec, time_start.tv_usec,
-                time_end.tv_sec, time_end.tv_usec);
-
-
-        } else if(strcmp(command, "CHECK") == 0) {
-            //Bad user input
-            if(ret != 2) {
-                errno = EINVAL;
-                perror("This call should take an CHECK <account_id>. Too many or too few args");
-                request_id--;
-                break;
-            } 
-
-            imm_response(request_id); 
-            account_id = strtol(params[1], &p, 10);
-            printf("The account id was %d\n", account_id);
-            ret = read_account(account_id);
-            gettimeofday(&time_end, NULL);
-            fprintf(fptr, "%d BAL %d TIME %ld.%06.ld %ld.%06.ld", 
-                    request_id, ret, 
-                    time_start.tv_sec, time_start.tv_usec,
-                    time_end.tv_sec, time_end.tv_usec);
-        } else {
-            errno = EINVAL;
-            request_id--;
-            perror("Failure to provide valid input");
+        ret = process_job(j, fptr);
+        //TODO: Add this shit to queue
+        if(ret == -1) { //End was input
+            running = 0;
         }
-        */
-        break;
+        errno = 0;
     }
 
     //Wait for all threads to join
@@ -211,8 +145,7 @@ void* worker() {
     flockfile(fptr);
     //DO WRITING HERE
     funlockfile(fptr);
-    printf("Hello!\n");
-    fflush(stdout);
+    //fflush(stdout);
     pthread_mutex_unlock(&queue_mut);
     //Deallocate job, transactions by now
 }

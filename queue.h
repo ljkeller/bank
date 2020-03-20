@@ -59,12 +59,7 @@ struct job* new_job(int req_id);
 
 void update_endt(struct job *j);
 
+void init_trans(struct trans *t, int acc_id, int amount);
+
 struct trans* new_trans(int acc_id, int amount);
-
-int proc_transactions(struct trans *t, int n_jobs);
-
-int proc_transaction(struct trans *t);
-
-void undo_transaction(struct trans *t);
-
 #endif /*end guard*/

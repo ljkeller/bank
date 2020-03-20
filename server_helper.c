@@ -29,7 +29,22 @@ int add_balance(int account_id, int amount) {
     write_account(account_id, balance + amount);
     return 0;
 }
-    
+
+ /*
+ * Modifies an account balance by given amount (positve or negative)
+ * Input: int account_id - ID of bank account to modify
+ * Input: int amount - amount to pay (+) or deduct (-)
+ * return: 0 on success, account_id on failure 
+ */
+int modify_balance(int account_id, int amount) {
+    int balance = read_account(account_id);
+    if((balance + amount) < 0) {
+        return account_id;
+    }
+    write_account(account_id, balance + amount);
+    return 0;
+}   
+
 /*
  * Check to see that an account has a specified amount of money
  * Input: int account_id - ID of bank account check balance of
@@ -74,8 +89,9 @@ int read_command(char command[], char *params[]){
      while(head != NULL){
           tracker = -1; // Tracks if & at eof
           params[i] = head;
-          if(strcmp(head, "&") == 0){
-               tracker = i;
+          //TODO: fix
+          if(strcmp(head, "/r/n") == 0){
+              i--;
           }
           head = strtok(NULL, delim); // continue through
           i++;
@@ -133,7 +149,7 @@ void write_file(FILE *fptr, char* params[], int argc){
 }
 
 void print_job(struct job *job) {
-    printf("Type: %d\tReq_id: %d\tCheck_acct: %d\tnum_trans: %d\tTime start: %ld.%06ld\n",
+    printf("Type: %d\tReq_id: %d\tCheck_acct: %d\tnum_trans: %d\tTime start: %ld.%06.ld\n",
             job->type,
             job->request_id,
             job->check_acc_id,
@@ -141,29 +157,19 @@ void print_job(struct job *job) {
             job->start_time.tv_sec, job->start_time.tv_usec);
 }
 
-int params_to_job(char *params[], int argc, struct job *request, int req_id) {
+int params_to_job(char *params[], int argc, struct job *j, int n_accounts) {
     char *p;
     struct trans *transactions;
     long ret_amount, ret_acct_id, ret;
     int i = 0, num_trans;
-    struct timeval cur_time;
     if(argc < 1) { //Insufficient args
         return EINVAL;
     }
      
-    //TODO: THis time might need fixing
-    ret = gettimeofday(&cur_time, NULL);
-    if(ret != 0) {
-        perror("Time-related issue.");
-        return ret;
-    }
-
-    request->start_time = cur_time;
-    request->request_id = req_id;
     if(strcmp(params[0], "END") == 0) {
-        request->type = END;
+        j->type = END;
     } else if(strcmp(params[0], "CHECK") == 0) {
-        request->type = CHECK;
+        j->type = CHECK;
         if(argc != 2) {
             errno = EINVAL;
             perror("It looks like there were an invalid number of args");
@@ -171,33 +177,42 @@ int params_to_job(char *params[], int argc, struct job *request, int req_id) {
         }
         ret_acct_id = strtol(params[1], &p, 10); 
         errno = validate_input(p, ret_acct_id, errno); //errno is thread safe/thread specific!
-        if(errno == 0) {
-            request->check_acc_id = ret_acct_id;
-        } else {
+        if(errno != 0) {
             errno = EINVAL;
             perror("It looks like there was an invalid account ID");
             return EINVAL;
-        }
-    } else if(strcmp(params[0], "TRANS") == 0) {
-        request->type = TRANS;
-        if((argc - 1) % 2 != 0) { //Need account_ID and amount for every transaction
+        } else if(ret_acct_id < 1 || ret_acct_id > n_accounts) {
             errno = EINVAL;
-            perror("It looks like there were an invalid amount of transfers.");
+            perror("Invalid acct number");
+            return EINVAL;
+        }
+        j->check_acc_id = ret_acct_id; //Update checking account info
+
+    } else if(strcmp(params[0], "TRANS") == 0) {
+        j->type = TRANS;
+        if((argc - 1) % 2 != 0 || argc > 21) { //Need account_ID and amount for every transaction
+            errno = EINVAL;
+            printf("It looks like there were an invalid amount of args: %d", argc);
             return EINVAL;
         }
         
         num_trans = (argc - 1) / 2;
-        request->num_trans = num_trans; //Dont update transactions here, just number
+        j->num_trans = num_trans; //Dont update transactions here, just number
         transactions = (struct trans*) malloc(sizeof(struct trans) * num_trans);
         
-        for(i = 1; i <= num_trans; i++) {
+        for(i = 1; i <= 2*num_trans; i+=2) {
             ret_acct_id = strtol(params[i], &p, 10);
             errno = validate_input(p, ret_acct_id, errno);
             if(errno != 0) {
                 perror("It looks like there was an error with acct_id");
                 free(transactions);
                 return EINVAL;
+            } else if(ret_acct_id < 1 || ret_acct_id > n_accounts) {
+                errno = EINVAL;
+                perror("Invalid acct number");
+                return EINVAL;
             }
+
             ret_amount = strtol(params[i + 1], &p, 10);
             errno = validate_input(p, ret_amount, errno);
             if(errno != 0) {
@@ -205,13 +220,96 @@ int params_to_job(char *params[], int argc, struct job *request, int req_id) {
                 free(transactions);
                 return EINVAL;
             }
-	        transactions[i].acc_id = ret_acct_id;
-	        transactions[i].amount = ret_amount;
+	        init_trans(&(transactions[i/2]), ret_acct_id, ret_amount);
         }
-        request->transactions = transactions;
+        j->transactions = transactions;
     } else {
         return EINVAL; //invalid input
     }
     return 0;
      
+}
+
+int proc_transactions(struct trans *t, int n_jobs) {
+    int i, k, ret = 0;
+    for(i = 0; i < n_jobs; i++) {
+        ret = proc_transaction(&(t[i]));
+        if(ret != 0) {
+            for(k = i - 1; k > -1; k--) {
+                undo_transaction(&(t[k]));
+            }
+            return t->acc_id;
+        }
+    }
+    return 0;
+}
+
+ /*
+ * Modifies an account balance by given amount (positve or negative)
+ * Input: stuct trans - the transaction to be processed
+ * return: 0 on success, account_id on failure 
+ */
+int proc_transaction(struct trans *t) {
+    int balance = read_account(t->acc_id);
+    if((balance + t->amount) < 0) {
+        return t->acc_id;
+    }
+    write_account(t->acc_id, balance + t->amount);
+    return 0;
+}
+
+/*
+ * Used to undo a previously done operation on a bank account
+ * Input: struct trans - the transaction to undo on target account/amount
+ */
+void undo_transaction(struct trans *t) {
+    int balance = read_account(t->acc_id);
+    write_account(t->acc_id, balance - t->amount);
+}
+
+/*
+ * Processes a given job by modifying accounts, checking accounts, or ending the program
+ * Input: struct job - Job to be processed based on type parameter
+ * Input: FILE * - Pointer to file being written
+ * Return: 0 on sucess or errno on failure
+ */
+int process_job(struct job *j, FILE *fptr) {
+    int ret;
+    if(j == NULL || j->type == 0) {
+        errno = EINVAL;
+        return EINVAL;
+    }
+    if(j->type == CHECK) { 
+        imm_response(j->request_id);
+        update_endt(j);
+        fprintf(fptr, "%d BAL %d TIME %ld.%06.ld %ld.%06ld\n", 
+                j->request_id, read_account(j->check_acc_id), 
+                j->start_time.tv_sec, j->start_time.tv_usec,
+                j->end_time.tv_sec, j->end_time.tv_usec);
+
+    } else if(j->type == TRANS) {
+        imm_response(j->request_id);
+        ret = proc_transactions(j->transactions, j->num_trans); //Ensure this frees jobs
+        update_endt(j);
+        if(ret == 0) { //Successfully processed transactions
+            fprintf(fptr, "%d OK TIME %ld.%06.ld %ld.%06ld\n", 
+                    j->request_id,
+                    j->start_time.tv_sec, j->start_time.tv_usec,
+                    j->end_time.tv_sec, j->end_time.tv_usec);
+        } else {
+            fprintf(fptr, "%d ISF %d %ld.%06.ld %ld.%06ld\n", 
+                    j->request_id, ret, 
+                    j->start_time.tv_sec, j->start_time.tv_usec,
+                    j->end_time.tv_sec, j->end_time.tv_usec);
+        } 
+    } else { //j->type == END
+            return -1;
+    }
+
+    return 0;
+}
+
+void fr_job(struct job *j) {
+    free(j->transactions);
+    free(j);
 }
