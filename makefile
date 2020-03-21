@@ -10,4 +10,4 @@ server_helper.o : server_helper.c server_helper.h queue.h
 queue.o : queue.h
 	cc -c queue.c
 clean: 
-	rm *output.txt appserver main.o Bank.o server_helper.o queue.o
+	rm *output.txt appserver main.o Bank.o server_helper.o queue.o testout*

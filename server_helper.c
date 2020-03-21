@@ -64,7 +64,6 @@ int has_balance(int account_id, int amount){
  * return: 0 on success, errno on failure 
  */
 int transfer_balance(int src_acct_id, int dst_acct_id, int amount) {
-    //TODO: Think on necessity of checker for negative balance    
     int ret = has_balance(src_acct_id, amount);
     if(ret < 0) {
         return EBADE;

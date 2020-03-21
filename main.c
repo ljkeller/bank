@@ -19,9 +19,9 @@
 
 void* worker();
 
-void mut_down_accts(struct job *j);
+void mut_down_accts(struct job *j, int *arr);
 
-void mut_up_accts(struct job *j);
+void mut_up_accts(struct job *j, int *arr);
 
 //Global variables shared by threads
 pthread_mutex_t *ACCT_muts, queue_mut;
@@ -152,7 +152,7 @@ int main(int argc, char* argv[]) {
 
 void* worker() { 
     struct job *j;
-    int ret;
+    int ret, job_IDs[10];
     pthread_mutex_lock(&queue_mut);
     while(end_signaled == 0 || job_queue.num_jobs > 0) {
         while(job_queue.num_jobs == 0 && end_signaled == 0) {
@@ -162,11 +162,12 @@ void* worker() {
         if(job_queue.num_jobs > 0) {
             j = pop(&job_queue);
             pthread_mutex_unlock(&queue_mut);
+            //TODO: MAKE THIS IN SORTED ORDER
+            mut_down_accts(j, job_IDs); //Check all counts not in use
             flockfile(fptr); //ensures order to file output
-            mut_down_accts(j); //Check all counts not in use
             ret = process_job(j, fptr);
             funlockfile(fptr);
-            mut_up_accts(j); //Unlock all acounts worked with in process
+            mut_up_accts(j, job_IDs); //Unlock all acounts worked with in process
             if(ret == -1) {//call to END
                 end_signaled = 1;
             }
@@ -177,24 +178,43 @@ void* worker() {
     return NULL;
 }
 
-void mut_down_accts(struct job *j) {
+void mut_down_accts(struct job *j, int *arr) {
     if(j->type == TRANS) {
         struct trans *t = j->transactions;
-        int i, acc_id, n = j->num_trans;
+        int i, k, acc_id, n = j->num_trans;
         for(i = 0; i < n; i++) {
             acc_id = t[i].acc_id;
-            pthread_mutex_lock(&ACCT_muts[acc_id]);
+            k = i - 1; //Insertion sort
+            while(k >= 0 && arr[k] > acc_id) {
+                arr[k+1] = arr[k];
+                k = k - 1;
+            }
+            arr[k+1] = acc_id;
+        }
+        //Remember, if dont lock in correct order there will be deadlocks
+        for(i = 0; i < n; i++) {
+            pthread_mutex_lock(&ACCT_muts[arr[i]]);
         }
     }
+
 }
 
-void mut_up_accts(struct job *j) {
+void mut_up_accts(struct job *j, int *arr) {
     if(j->type == TRANS) {
         struct trans *t = j->transactions;
-        int i, acc_id, n = j->num_trans;
+        int i, k, acc_id, n = j->num_trans;
         for(i = 0; i < n; i++) {
             acc_id = t[i].acc_id;
-            pthread_mutex_unlock(&ACCT_muts[acc_id]);
+            k = i - 1; //Insertion sort
+            while(k >= 0 && arr[k] > acc_id) {
+                arr[k+1] = arr[k];
+                k = k - 1;
+            }
+            arr[k+1] = acc_id;
+        }
+        //Remember, if dont lock in correct order there will be deadlocks
+        for(i = 0; i < n; i++) {
+            pthread_mutex_unlock(&ACCT_muts[arr[i]]);
         }
     }
 }
