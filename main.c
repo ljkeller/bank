@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <limits.h>
+#include <sys/select.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
@@ -24,7 +25,7 @@ void mut_down_accts(struct job *j);
 void mut_up_accts(struct job *j);
 
 //Global variables shared by threads
-pthread_mutex_t *ACCT_muts, queue_mut;
+pthread_mutex_t acct_mut, queue_mut;
 
 pthread_cond_t consumer_cv;
 
@@ -37,7 +38,7 @@ FILE *fptr;
 
 int main(int argc, char* argv[]) {
     pthread_t *tid_workers; //Record thread IDs for all workers
-
+    fd_set rfds;
     struct job first_job, *j;
     char *p, *params[PARAM_SIZE], *command;
     char filename[PARAM_SIZE], buffer[BUFFER_SIZE];
@@ -45,7 +46,8 @@ int main(int argc, char* argv[]) {
     int src_account;
     errno = 0;
     long ID = 0;
-    struct timeval time_start, time_end;
+    struct timeval tv;
+    FILE *finputs;
 
     //Program initialization and input checking
     if(argc != 4) {
@@ -69,17 +71,15 @@ int main(int argc, char* argv[]) {
         perror("It looks like there was in invalid input.\n");
     } 
     n_accounts = arg;
-    ACCT_muts = (pthread_mutex_t *) malloc(sizeof(pthread_mutex_t) * n_accounts);
-    for(i = 0; i < n_accounts; i++) {
-        pthread_mutex_init(&ACCT_muts[i], NULL); //Initialize all account mutexes
-    }
     pthread_mutex_init(&queue_mut, NULL); //Initializae the queue
+    pthread_mutex_init(&acct_mut, NULL); //Initializae the queue
     pthread_cond_init(&consumer_cv, NULL); //Init consumer cv
 
     //File handling for output file
     strcpy(filename, argv[3]);
     strcat(filename, ".txt");
     fptr = fopen(filename, "w+");
+    finputs = fopen("inputs.txt", "w+");
     if(fptr == NULL) {
         errno = EINVAL;
         perror("Bad file handling\n");
@@ -106,28 +106,39 @@ int main(int argc, char* argv[]) {
         pthread_create(&tid_workers[i], NULL, worker, NULL);
     }
 
+    tv.tv_sec = 5;
+    tv.tv_usec = 0;
+    printf("Accepting user input: ");
     // Ready to run bank server and take requests
     while(end_signaled == 0) {
-        printf("Accepting user input: ");
-        p = fgets(buffer, BUFFER_SIZE, stdin);
-        gettimeofday(&time_start, NULL);
+        errno = 0;
+        FD_ZERO(&rfds);
+        FD_SET(0, &rfds);
 
+        ret = select(1, &rfds, NULL, NULL, &tv);
+        if(ret) {
+            p = fgets(buffer, BUFFER_SIZE, stdin);
+        } else {
+            continue;
+        }
         if(p == NULL){
             errno = EINVAL;
             request_id--;
             perror("Looks like there was problems taking input.\n");
+            continue;
         }
         request_id++;
+        fprintf(finputs, buffer);
         ret = read_command(buffer, params);
         if(end_signaled) {
             printf("Sorry, we closed during your user input\n");
             break;
         }
         j = new_job(request_id);
-        command = params[0];
         ret = params_to_job(params, ret, j, n_accounts);
         if(ret != 0) {
             fr_job(j); //DEALLOCATE JOBS AND TRANSACTIONS
+            fprintf(finputs, "THERE WERE ISSUES WITH THE ABOVE LINE\n");
             errno = ret;
             printf("Resetting request id\n");
             request_id--;
@@ -137,7 +148,6 @@ int main(int argc, char* argv[]) {
             pthread_mutex_unlock(&queue_mut);
             pthread_cond_signal(&consumer_cv); //for the workers blocked on cv
         }
-        errno = 0;
     }
 
     //Wait for all threads to join
@@ -147,6 +157,7 @@ int main(int argc, char* argv[]) {
     }
 
     fclose(fptr);
+    fclose(finputs);
     return 0; 
 }
 
@@ -163,10 +174,11 @@ void* worker() {
             j = pop(&job_queue);
             pthread_mutex_unlock(&queue_mut);
             flockfile(fptr); //ensures order to file output
-            mut_down_accts(j); //Check all counts not in use
+            fflush(fptr);
+            pthread_mutex_lock(&acct_mut);
             ret = process_job(j, fptr);
             funlockfile(fptr);
-            mut_up_accts(j); //Unlock all acounts worked with in process
+            pthread_mutex_unlock(&acct_mut);
             if(ret == -1) {//call to END
                 end_signaled = 1;
             }
@@ -175,26 +187,4 @@ void* worker() {
     }
     pthread_mutex_unlock(&queue_mut);
     return NULL;
-}
-
-void mut_down_accts(struct job *j) {
-    if(j->type == TRANS) {
-        struct trans *t = j->transactions;
-        int i, acc_id, n = j->num_trans;
-        for(i = 0; i < n; i++) {
-            acc_id = t[i].acc_id;
-            pthread_mutex_lock(&ACCT_muts[acc_id]);
-        }
-    }
-}
-
-void mut_up_accts(struct job *j) {
-    if(j->type == TRANS) {
-        struct trans *t = j->transactions;
-        int i, acc_id, n = j->num_trans;
-        for(i = 0; i < n; i++) {
-            acc_id = t[i].acc_id;
-            pthread_mutex_unlock(&ACCT_muts[acc_id]);
-        }
-    }
 }

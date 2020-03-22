@@ -238,7 +238,7 @@ int proc_transactions(struct trans *t, int n_jobs) {
             for(k = i - 1; k > -1; k--) {
                 undo_transaction(&(t[k]));
             }
-            return t->acc_id;
+            return t[i].acc_id;
         }
     }
     return 0;
