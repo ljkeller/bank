@@ -1,6 +1,9 @@
+import sys
+
 if __name__ == '__main__':
    print("Opening the file") 
-   file = open("testout-2725.txt")
+   fname = sys.argv[1]
+   file = open(fname)
    balance_total = 0
    accounts = 0
    ISF_total = 0
@@ -9,7 +12,6 @@ if __name__ == '__main__':
 
    for line in file:
        tok_line = line.split()
-       print(tok_line)
     
        if "BAL" in line:
            balance_total += int(tok_line[2])
@@ -17,8 +19,6 @@ if __name__ == '__main__':
        elif "ISF" in line:
             ISF_total += 1
             print(line)
-       elif "5828066" in line:
-           print(line)
 
    print(f"The total accounts is {accounts}, the total balance is {balance_total}," 
             f"and the ISF_total is {ISF_total}")

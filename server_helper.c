@@ -297,7 +297,7 @@ int process_job(struct job *j, FILE *fptr) {
                     j->start_time.tv_sec, j->start_time.tv_usec,
                     j->end_time.tv_sec, j->end_time.tv_usec);
         } else {
-            fprintf(fptr, "%d ISF %d %ld.%06.ld %ld.%06ld\n", 
+            fprintf(fptr, "%d ISF %d TIME %ld.%06.ld %ld.%06ld\n", 
                     j->request_id, ret, 
                     j->start_time.tv_sec, j->start_time.tv_usec,
                     j->end_time.tv_sec, j->end_time.tv_usec);

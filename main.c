@@ -77,7 +77,6 @@ int main(int argc, char* argv[]) {
 
     //File handling for output file
     strcpy(filename, argv[3]);
-    strcat(filename, ".txt");
     fptr = fopen(filename, "w+");
     finputs = fopen("inputs.txt", "w+");
     if(fptr == NULL) {
@@ -138,7 +137,6 @@ int main(int argc, char* argv[]) {
         ret = params_to_job(params, ret, j, n_accounts);
         if(ret != 0) {
             fr_job(j); //DEALLOCATE JOBS AND TRANSACTIONS
-            fprintf(finputs, "THERE WERE ISSUES WITH THE ABOVE LINE\n");
             errno = ret;
             printf("Resetting request id\n");
             request_id--;

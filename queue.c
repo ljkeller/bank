@@ -8,14 +8,15 @@
 
 struct job* new_job(int req_id) {
     struct job *j = malloc(sizeof(struct job));
-    struct timeval placeholder;
+    struct timeval placeholder, curtime;
+    gettimeofday(&(curtime), NULL);
     j->type = 0;
     j->next = NULL;
     j->request_id = req_id;
     j->check_acc_id = 0; //Accs start at 0 goto n
     j->transactions = NULL;
     j->num_trans = 0;
-    gettimeofday(&(j->start_time), NULL);
+    j->start_time = curtime;
     j->end_time = placeholder;
     return j;
 }
