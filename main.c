@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/select.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
@@ -37,7 +38,7 @@ FILE *fptr;
 
 int main(int argc, char* argv[]) {
     pthread_t *tid_workers; //Record thread IDs for all workers
-
+    fd_set rfds;
     struct job first_job, *j;
     char *p, *params[PARAM_SIZE], *command;
     char filename[PARAM_SIZE], buffer[BUFFER_SIZE];
@@ -45,7 +46,7 @@ int main(int argc, char* argv[]) {
     int src_account;
     errno = 0;
     long ID = 0;
-    struct timeval time_start, time_end;
+    struct timeval tv;
 
     //Program initialization and input checking
     if(argc != 4) {
@@ -78,7 +79,6 @@ int main(int argc, char* argv[]) {
 
     //File handling for output file
     strcpy(filename, argv[3]);
-    strcat(filename, ".txt");
     fptr = fopen(filename, "w+");
     if(fptr == NULL) {
         errno = EINVAL;
@@ -106,16 +106,26 @@ int main(int argc, char* argv[]) {
         pthread_create(&tid_workers[i], NULL, worker, NULL);
     }
 
+    tv.tv_sec = 5;
+    tv.tv_usec = 0;
     // Ready to run bank server and take requests
     while(end_signaled == 0) {
-        printf("Accepting user input: ");
-        p = fgets(buffer, BUFFER_SIZE, stdin);
-        gettimeofday(&time_start, NULL);
+        errno = 0;
+        FD_ZERO(&rfds);
+        FD_SET(0, &rfds);
+
+        ret = select(1, &rfds, NULL, NULL, &tv);
+        if(ret) {
+            p = fgets(buffer, BUFFER_SIZE, stdin);
+        } else {
+            continue;
+        }
 
         if(p == NULL){
             errno = EINVAL;
             request_id--;
             perror("Looks like there was problems taking input.\n");
+            continue;
         }
         request_id++;
         ret = read_command(buffer, params);
@@ -124,7 +134,6 @@ int main(int argc, char* argv[]) {
             break;
         }
         j = new_job(request_id);
-        command = params[0];
         ret = params_to_job(params, ret, j, n_accounts);
         if(ret != 0) {
             fr_job(j); //DEALLOCATE JOBS AND TRANSACTIONS
@@ -137,7 +146,6 @@ int main(int argc, char* argv[]) {
             pthread_mutex_unlock(&queue_mut);
             pthread_cond_signal(&consumer_cv); //for the workers blocked on cv
         }
-        errno = 0;
     }
 
     //Wait for all threads to join
@@ -202,16 +210,7 @@ void mut_down_accts(struct job *j, int *arr) {
 void mut_up_accts(struct job *j, int *arr) {
     if(j->type == TRANS) {
         struct trans *t = j->transactions;
-        int i, k, acc_id, n = j->num_trans;
-        for(i = 0; i < n; i++) {
-            acc_id = t[i].acc_id;
-            k = i - 1; //Insertion sort
-            while(k >= 0 && arr[k] > acc_id) {
-                arr[k+1] = arr[k];
-                k = k - 1;
-            }
-            arr[k+1] = acc_id;
-        }
+        int i, n = j->num_trans;
         //Remember, if dont lock in correct order there will be deadlocks
         for(i = 0; i < n; i++) {
             pthread_mutex_unlock(&ACCT_muts[arr[i]]);

@@ -88,7 +88,6 @@ int read_command(char command[], char *params[]){
      while(head != NULL){
           tracker = -1; // Tracks if & at eof
           params[i] = head;
-          //TODO: fix
           if(strcmp(head, "/r/n") == 0){
               i--;
           }
@@ -237,7 +236,7 @@ int proc_transactions(struct trans *t, int n_jobs) {
             for(k = i - 1; k > -1; k--) {
                 undo_transaction(&(t[k]));
             }
-            return t->acc_id;
+            return t[i].acc_id;
         }
     }
     return 0;
@@ -281,7 +280,7 @@ int process_job(struct job *j, FILE *fptr) {
     if(j->type == CHECK) { 
         imm_response(j->request_id);
         update_endt(j);
-        fprintf(fptr, "%d BAL %d TIME %ld.%06.ld %ld.%06ld\n", 
+        fprintf(fptr, "%d BAL %d TIME %ld.%06ld %ld.%06ld\n", 
                 j->request_id, read_account(j->check_acc_id), 
                 j->start_time.tv_sec, j->start_time.tv_usec,
                 j->end_time.tv_sec, j->end_time.tv_usec);
@@ -291,12 +290,12 @@ int process_job(struct job *j, FILE *fptr) {
         ret = proc_transactions(j->transactions, j->num_trans); //Ensure this frees jobs
         update_endt(j);
         if(ret == 0) { //Successfully processed transactions
-            fprintf(fptr, "%d OK TIME %ld.%06.ld %ld.%06ld\n", 
-                    j->request_id,
+            fprintf(fptr, "%d OK TIME %ld.%06ld %ld.%06ld\n", 
+                    j->request_id, 
                     j->start_time.tv_sec, j->start_time.tv_usec,
                     j->end_time.tv_sec, j->end_time.tv_usec);
         } else {
-            fprintf(fptr, "%d ISF %d %ld.%06.ld %ld.%06ld\n", 
+            fprintf(fptr, "%d ISF %d TIME %ld.%06ld %ld.%06ld\n", 
                     j->request_id, ret, 
                     j->start_time.tv_sec, j->start_time.tv_usec,
                     j->end_time.tv_sec, j->end_time.tv_usec);
