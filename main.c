@@ -164,23 +164,22 @@ void* worker() {
     pthread_mutex_lock(&queue_mut);
     while(end_signaled == 0 || job_queue.num_jobs > 0) {
         while(job_queue.num_jobs == 0 && end_signaled == 0) {
-            fflush(stdout);
             pthread_cond_wait(&consumer_cv, &queue_mut); //Yield mut to main for more jobs
         }
         if(job_queue.num_jobs > 0) {
             j = pop(&job_queue);
             pthread_mutex_unlock(&queue_mut);
-            //TODO: MAKE THIS IN SORTED ORDER
             mut_down_accts(j, job_IDs); //Check all counts not in use
-            flockfile(fptr); //ensures order to file output
+            //flockfile(fptr); //ensures order to file output
             ret = process_job(j, fptr);
-            funlockfile(fptr);
+            //funlockfile(fptr);
             mut_up_accts(j, job_IDs); //Unlock all acounts worked with in process
             if(ret == -1) {//call to END
                 end_signaled = 1;
             }
             fr_job(j); //DEALLOCATE JOBS AND TRANSACTIONS
         }
+    pthread_mutex_lock(&queue_mut);
     }
     pthread_mutex_unlock(&queue_mut);
     return NULL;
@@ -192,6 +191,7 @@ void mut_down_accts(struct job *j, int *arr) {
         int i, k, acc_id, n = j->num_trans;
         for(i = 0; i < n; i++) {
             acc_id = t[i].acc_id;
+            arr[i] = acc_id;
             k = i - 1; //Insertion sort
             while(k >= 0 && arr[k] > acc_id) {
                 arr[k+1] = arr[k];
@@ -201,9 +201,9 @@ void mut_down_accts(struct job *j, int *arr) {
         }
         //Remember, if dont lock in correct order there will be deadlocks
         for(i = 0; i < n; i++) {
-            pthread_mutex_lock(&ACCT_muts[arr[i]]);
+            pthread_mutex_lock(&ACCT_muts[arr[i] - 1]);
         }
-    }
+    } 
 
 }
 
@@ -212,8 +212,8 @@ void mut_up_accts(struct job *j, int *arr) {
         struct trans *t = j->transactions;
         int i, n = j->num_trans;
         //Remember, if dont lock in correct order there will be deadlocks
-        for(i = 0; i < n; i++) {
-            pthread_mutex_unlock(&ACCT_muts[arr[i]]);
+        for(i = n - 1; i > -1; i--) {
+            pthread_mutex_unlock(&ACCT_muts[arr[i] - 1]);
         }
     }
 }

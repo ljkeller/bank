@@ -129,10 +129,6 @@ void imm_response(int request_id){
     printf("ID %d\n", request_id);
 }
 
-int proc_trans(){
-    return 0;
-}
-
 /*
  * Writes given parameters to file to log behaviour
  * Input: FILE *fptr - the file being written
