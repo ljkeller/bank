@@ -178,6 +178,8 @@ void* worker() {
                 end_signaled = 1;
             }
             fr_job(j); //DEALLOCATE JOBS AND TRANSACTIONS
+        } else {
+            pthread_mutex_unlock(&queue_mut);
         }
     pthread_mutex_lock(&queue_mut);
     }

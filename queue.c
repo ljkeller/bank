@@ -62,7 +62,10 @@ struct job* pop(struct queue *q) {
     if(q->num_jobs < 1) {
         errno = EINVAL;
         return NULL;
+    } else if(q->num_jobs == 1) {
+        q->tail = NULL;
     }
+
     struct job *j = q->head;
     q->head = q->head->next;
     q->num_jobs--;
