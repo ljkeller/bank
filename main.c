@@ -25,7 +25,7 @@ void mut_down_accts(struct job *j);
 void mut_up_accts(struct job *j);
 
 //Global variables shared by threads
-pthread_mutex_t acct_mut, queue_mut;
+pthread_mutex_t queue_mut, acct_mut;
 
 pthread_cond_t consumer_cv;
 
@@ -165,24 +165,48 @@ void* worker() {
     pthread_mutex_lock(&queue_mut);
     while(end_signaled == 0 || job_queue.num_jobs > 0) {
         while(job_queue.num_jobs == 0 && end_signaled == 0) {
-            fflush(stdout);
-            pthread_cond_wait(&consumer_cv, &queue_mut); //Yield mut to main for more jobs
+            pthread_cond_wait(&consumer_cv, &queue_mut);
+        } //Once out, has access to mut
+        j = pop(&job_queue);
+        if(j != NULL) {
+            pthread_mutex_unlock(&queue_mut);
+            pthread_mutex_lock(&acct_mut);
+            ret = process_job(j, fptr);
+            pthread_mutex_unlock(&acct_mut);
+            if(ret == -1) {
+                end_signaled = 1;
+                break;
+            }
         }
+        if(end_signaled != 0) {
+            pthread_mutex_lock(&queue_mut);
+        }
+        while(job_queue.num_jobs == 0 && end_signaled == 0) {
+            pthread_cond_wait(&consumer_cv, &queue_mut);
+        }
+    }
+
+    /*
+    while(end_signaled == 0 || job_queue.num_jobs > 0) {
         if(job_queue.num_jobs > 0) {
             j = pop(&job_queue);
             pthread_mutex_unlock(&queue_mut);
-            flockfile(fptr); //ensures order to file output
-            fflush(fptr);
             pthread_mutex_lock(&acct_mut);
+            //flockfile(fptr); //ensures order to file output
+            //fflush(fptr);
             ret = process_job(j, fptr);
-            funlockfile(fptr);
             pthread_mutex_unlock(&acct_mut);
+            //funlockfile(fptr);
             if(ret == -1) {//call to END
                 end_signaled = 1;
             }
             fr_job(j); //DEALLOCATE JOBS AND TRANSACTIONS
         }
-    }
+        pthread_mutex_lock(&queue_mut);
+        while(job_queue.num_jobs == 0 && end_signaled == 0) {
+            pthread_cond_wait(&consumer_cv, &queue_mut); //Yield mut to main for more jobs
+        }
+    }*/
     pthread_mutex_unlock(&queue_mut);
     return NULL;
 }
