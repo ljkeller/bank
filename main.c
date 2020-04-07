@@ -47,7 +47,6 @@ int main(int argc, char* argv[]) {
     errno = 0;
     long ID = 0;
     struct timeval tv;
-    FILE *finputs;
 
     //Program initialization and input checking
     if(argc != 4) {
@@ -78,7 +77,6 @@ int main(int argc, char* argv[]) {
     //File handling for output file
     strcpy(filename, argv[3]);
     fptr = fopen(filename, "w+");
-    finputs = fopen("inputs.txt", "w+");
     if(fptr == NULL) {
         errno = EINVAL;
         perror("Bad file handling\n");
@@ -127,7 +125,6 @@ int main(int argc, char* argv[]) {
             continue;
         }
         request_id++;
-        fprintf(finputs, buffer);
         ret = read_command(buffer, params);
         if(end_signaled) {
             printf("Sorry, we closed during your user input\n");
@@ -155,7 +152,6 @@ int main(int argc, char* argv[]) {
     }
 
     fclose(fptr);
-    fclose(finputs);
     return 0; 
 }
 
@@ -178,35 +174,14 @@ void* worker() {
                 break;
             }
         }
-        if(end_signaled != 0) {
+        if(end_signaled == 0) {
             pthread_mutex_lock(&queue_mut);
         }
+
         while(job_queue.num_jobs == 0 && end_signaled == 0) {
             pthread_cond_wait(&consumer_cv, &queue_mut);
         }
     }
-
-    /*
-    while(end_signaled == 0 || job_queue.num_jobs > 0) {
-        if(job_queue.num_jobs > 0) {
-            j = pop(&job_queue);
-            pthread_mutex_unlock(&queue_mut);
-            pthread_mutex_lock(&acct_mut);
-            //flockfile(fptr); //ensures order to file output
-            //fflush(fptr);
-            ret = process_job(j, fptr);
-            pthread_mutex_unlock(&acct_mut);
-            //funlockfile(fptr);
-            if(ret == -1) {//call to END
-                end_signaled = 1;
-            }
-            fr_job(j); //DEALLOCATE JOBS AND TRANSACTIONS
-        }
-        pthread_mutex_lock(&queue_mut);
-        while(job_queue.num_jobs == 0 && end_signaled == 0) {
-            pthread_cond_wait(&consumer_cv, &queue_mut); //Yield mut to main for more jobs
-        }
-    }*/
     pthread_mutex_unlock(&queue_mut);
     return NULL;
 }
