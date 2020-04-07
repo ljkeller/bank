@@ -143,7 +143,7 @@ void write_file(FILE *fptr, char* params[], int argc){
 }
 
 void print_job(struct job *job) {
-    printf("Type: %d\tReq_id: %d\tCheck_acct: %d\tnum_trans: %d\tTime start: %ld.%06.ld\n",
+    printf("Type: %d\tReq_id: %d\tCheck_acct: %d\tnum_trans: %d\tTime start: %ld.%06ld\n",
             job->type,
             job->request_id,
             job->check_acc_id,
