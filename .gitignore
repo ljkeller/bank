@@ -1,6 +1,8 @@
 # executable
 appserver
 *.swp
+script
+test*.c
 # Prerequisites
 *.d
 
